@@ -18,9 +18,10 @@ def get_user_statistics(token):
 
     dialogs = [chat for chat in chats if chat['is_dialog']]
     messages = get_user_messages(chats, user['id'], token)
-    words, chars = get_all_words(messages)
+    words, chars = get_all_words([_['content'] for _ in messages])
 
     period, counter, sent = most_active_period(messages)
+    act_words, act_chars = get_all_words(sent)
 
     response_object = {
         'status': 'success',
@@ -35,7 +36,8 @@ def get_user_statistics(token):
             'chars_num': chars,
             'most_active_period': period,
             'most_active_mess_num': counter,
-            'most_active_sent_messages': sent
+            'most_active_words_num': len(act_words),
+            'most_active_chars_num': act_chars
         }
     }
 
@@ -93,7 +95,7 @@ def count_days(registered_date):
 
 
 def get_all_words(messages):
-    joined = ' '.join([_['content'] for _ in messages])
+    joined = ' '.join(messages)
     return joined.split(' '), len(sub('($% #*^-":;)\'/+\\_&.@?!=', '', joined))
 
 
