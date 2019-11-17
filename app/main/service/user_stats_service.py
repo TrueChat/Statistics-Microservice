@@ -16,11 +16,11 @@ def get_user_statistics(token):
     user = get_user_info(token)
     chats = get_user_chats(token)
 
-    print(user)
-
     dialogs = [chat for chat in chats if chat['is_dialog']]
     messages = get_user_messages(chats, user['id'], token)
     words, chars = get_all_words(messages)
+
+    period, counter, sent = most_active_period(messages)
 
     response_object = {
         'status': 'success',
@@ -33,7 +33,9 @@ def get_user_statistics(token):
             'messages_num': len(messages),
             'words_num': len(words),
             'chars_num': chars,
-            'groups': group_messages(messages)
+            'most_active_period': period,
+            'most_active_mess_num': counter,
+            'most_active_sent_messages': sent
         }
     }
 
@@ -96,32 +98,71 @@ def get_all_words(messages):
 
 
 def most_active_period(messages):
-    PERIODS = {
-        'Night (0.00 - 4.00)': (time(0, 0, 0), time(4, 0, 0)),
-        'Early morning (4.00 - 7.00)': (time(4, 0, 0), time(7, 0, 0)),
-        'Morning (7.00 - 12.00)': (time(7, 0, 0), time(12, 0, 0)),
-        'Daytime (12.00 - 16.00)': (time(12, 0, 0), time(16, 0, 0)),
-        'Early evening (16.00 - 20.00)': (time(16, 0, 0), time(20, 0, 0)),
-        'Evening (20.00 - 0.00)': (time(20, 0, 0), time(0, 0, 0))
-    }
+    PERIODS = [
+        'Night (0.00 - 4.00)',
+        'Early morning (4.00 - 7.00)',
+        'Morning (7.00 - 12.00)',
+        'Daytime (12.00 - 16.00)',
+        'Early evening (16.00 - 20.00)',
+        'Evening (20.00 - 0.00)'
+    ]
+
+    temp = group_messages(messages)
+    print('\n\n\n',temp,'\n\n\n')
+    grouped = {}
+    for dct in temp:
+        grouped.update(dct)
+    print('\n\n\n',grouped,'\n\n\n')
+
+    periods_counters = [0] * len(PERIODS)
+    periods_grouped = [[]] * len(PERIODS)
+
+    for key, value in grouped.items():
+        if time_in_range(0, 4, key):
+            periods_counters[0] += len(value)
+            periods_grouped[0] += value
+        elif time_in_range(4, 7, key):
+            periods_counters[1] += len(value)
+            periods_grouped[1] += value
+        elif time_in_range(7, 12, key):
+            periods_counters[2] += len(value)
+            periods_grouped[2] += value
+        elif time_in_range(12, 16, key):
+            periods_counters[3] += len(value)
+            periods_grouped[3] += value
+        elif time_in_range(16, 20, key):
+            periods_counters[4] += len(value)
+            periods_grouped[4] += value
+        elif time_in_range(20, 0, key):
+            periods_counters[5] += len(value)
+            periods_grouped[5] += value
+    
+    ind = periods_counters.index(max(periods_counters))
+
+    return (
+        PERIODS[ind],
+        periods_counters[ind],
+        periods_grouped[ind]
+    )
 
 
-'''
 def group_messages(messages):
     groups = set(
         map(
             lambda x: datetime.strptime(
                 x['date_created'], 
-                "%Y-%m-%dT%H:%M:%S.983527Z"
+                "%Y-%m-%dT%H:%M:%S.%fZ"
             ).time().hour, 
             messages
         )
     )
-    return [len([y for y in messages if datetime.strptime(
+
+    max_group = max(groups)
+
+    return [{x: [y['content'] for y in messages if datetime.strptime(
                 y['date_created'], 
-                "%Y-%m-%dT%H:%M:%S.983527Z"
-            ).time().hour == x]) for x in groups]
-'''
+                "%Y-%m-%dT%H:%M:%S.%fZ"
+            ).time().hour == x]} for x in groups]
 
 
 def time_in_range(start, end, x):
