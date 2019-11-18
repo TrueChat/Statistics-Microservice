@@ -1,3 +1,4 @@
+from collections import Counter
 from datetime import date
 from datetime import datetime
 from datetime import time
@@ -37,7 +38,8 @@ def get_user_statistics(token):
             'most_active_period': period,
             'most_active_mess_num': counter,
             'most_active_words_num': len(act_words),
-            'most_active_chars_num': act_chars
+            'most_active_chars_num': act_chars,
+            'top_words': get_top_words(words)
         }
     }
 
@@ -96,7 +98,8 @@ def count_days(registered_date):
 
 def get_all_words(messages):
     joined = ' '.join(messages)
-    return joined.split(' '), len(sub('($% #*^-":;)\'/+\\_&.@?!=', '', joined))
+    return [word for word in joined.split(' ') if len(word) > 2], \
+    len(sub('($% #*^-":;)\'/+\\_&.@?!=', '', joined))
 
 
 def most_active_period(messages):
@@ -110,11 +113,9 @@ def most_active_period(messages):
     ]
 
     temp = group_messages(messages)
-    print('\n\n\n',temp,'\n\n\n')
     grouped = {}
     for dct in temp:
         grouped.update(dct)
-    print('\n\n\n',grouped,'\n\n\n')
 
     periods_counters = [0] * len(PERIODS)
     periods_grouped = [[]] * len(PERIODS)
@@ -159,8 +160,6 @@ def group_messages(messages):
         )
     )
 
-    max_group = max(groups)
-
     return [{x: [y['content'] for y in messages if datetime.strptime(
                 y['date_created'], 
                 "%Y-%m-%dT%H:%M:%S.%fZ"
@@ -172,3 +171,12 @@ def time_in_range(start, end, x):
         return start <= x < end
     else:
         return start <= x or x < end
+
+
+def get_top_words(words):
+    return [
+        {
+            'word': word[0],
+            'count': word[1]
+        } for word in Counter(words).most_common(10)
+    ]
