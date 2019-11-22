@@ -9,7 +9,7 @@ from app.main import create_app, db
 from app import blueprint
 
 
-app = create_app(os.getenv('BOILERPLATE_ENV') or 'dev')
+app = create_app('dev')
 app.register_blueprint(blueprint)
 
 app.app_context().push()

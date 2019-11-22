@@ -11,7 +11,7 @@ def token_required(f):
     def decorated(*args, **kwargs):
 
         user_check = get(
-            BASE_URL + '/rest-auth/user/',
+            BASE_URL + '/profile/',
             headers={'Authorization': request.headers.get('Authorization')}
         )
 
@@ -30,7 +30,7 @@ def admin_token_required(f):
     def decorated(*args, **kwargs):
 
         user_check = get(
-            BASE_URL + '/rest-auth/user/',
+            BASE_URL + '/profile/',
             headers={'Authorization': request.headers.get('Authorization')}
         )
 

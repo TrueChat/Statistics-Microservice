@@ -1,62 +1,155 @@
+import base64
 from collections import Counter
 from datetime import date
 from datetime import datetime
 from datetime import time
 from functools import reduce
+import io
 from json import loads
 from re import sub
 
+from flask import send_file
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+import matplotlib.pyplot as plt
+import numpy as np
 from requests import get
 
 from .. import BASE_URL
+from .. import db
 from ..model.user import User
 from ..model.user_word import UserWord
 
 
 def get_user_statistics(token):
-    user = get_user_info(token)
+    user_info = get_user_info(token)
+    user = User.query.filter_by(id=user_info['id']).first()
+
+    if user:
+        if time_to_update(user.update_time):
+            update_statistics(user_info, token, user)
+    else:
+        update_statistics(user_info, token, user)
+
+    return User.query.filter_by(id=user_info['id']).first()
+
+
+def get_user_barchart(token):
+    user_info = get_user_info(token)
+    user = User.query.filter_by(id=user_info['id']).first()
+
+    if not user:
+        response_object = {
+            'message': 'User not found'
+        }
+        return response_object, 404
+    
+    plt.rcdefaults()
+    fig, ax = plt.subplots()
+
+    names = [word.word for word in user.words]
+    y_pos = np.arange(len(names))
+    performance = [word.count for word in user.words]
+
+    ax.barh(y_pos, performance, align='center', color=(0.11, 0.11, 0.14, 1.0))
+    ax.set_yticks(y_pos)
+    ax.set_yticklabels(names, ha='left')
+    ax.invert_yaxis()  # labels read top-to-bottom
+
+    #ax.xaxis.label.set_color('A4A4A6')
+    title = ax.set_title('Top meaningful words')
+    title.set_color(color=(0.64, 0.64, 0.648, 1.0))
+
+    plt.tick_params(
+        axis='x',
+        which='both',
+        bottom=False,
+        top=False,
+        labelbottom=False
+    )
+
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['left'].set_visible(False)
+    ax.spines['bottom'].set_visible(False)
+
+    ax.tick_params(axis='x', colors=(0.64, 0.64, 0.648, 1.0))
+    ax.tick_params(axis='y', colors=(0.11, 0.11, 0.14, 1.0))
+
+    ax.tick_params(axis="y",direction="in", pad=-10)
+
+    [i.set_color(color=(0.64, 0.64, 0.648, 1.0)) for i in plt.gca().get_yticklabels()]
+    [i.set_color(color=(0.64, 0.64, 0.648, 1.0)) for i in plt.gca().get_xticklabels()]
+
+    #plt.figure(num=None, figsize=(8, 6), dpi=80, facecolor='w', edgecolor='k')
+
+    for i, v in enumerate(user.words):
+        plt.text(v.count+0.2, i, str(round(v.count, 2)), color=(0.64, 0.64, 0.648, 1.0), va="center")
+
+    plt.tight_layout()
+
+    #output = io.BytesIO()
+    #FigureCanvas(fig).print_png(output)
+    #return Response(output.getvalue(), mimetype='image/png')
+    img = io.BytesIO()
+
+    plt.savefig(img, transparent=True, format='png')
+    img.seek(0)
+
+    response = send_file(img, attachment_filename='barchart.png',
+                 mimetype='image/png')
+    return response
+
+
+def get_user_words(token):
+    user_info = get_user_info(token)
+    return User.query.filter_by(id=user_info['id']).first()
+
+
+def update_statistics(user_info, token, user):
+    if not user:
+        user = User(
+            id=user_info['id'],
+            update_time=datetime.utcnow()
+        )
+        db.session.add(user)
+
     chats = get_user_chats(token)
 
     dialogs = [chat for chat in chats if chat['is_dialog']]
-    messages = get_user_messages(chats, user['id'], token)
+    messages = get_user_messages(chats, user_info['id'], token)
     words, chars = get_all_words([_['content'] for _ in messages])
 
     period, counter, sent = most_active_period(messages)
     act_words, act_chars = get_all_words(sent)
 
-    response_object = {
-        'status': 'success',
-        'message': 'Statistics was gathered',
-        'data': {
-            'chats_num': len(chats),
-            'dialogs_num': len(dialogs),
-            'groups_num': len(chats) - len(dialogs),
-            'days_with': count_days(user.get('date_joined')),
-            'messages_num': len(messages),
-            'words_num': len(words),
-            'chars_num': chars,
-            'most_active_period': period,
-            'most_active_mess_num': counter,
-            'most_active_words_num': len(act_words),
-            'most_active_chars_num': act_chars,
-            'top_words': get_top_words(words)
-        }
-    }
+    chat_num = len(chats)
+    dialog_num = len(dialogs)
 
-    return response_object, 200
+    user.chats_num = chat_num
+    user.dialogs_num = dialog_num
+    user.groups_num = chat_num - dialog_num
+    user.days_with = count_days(user_info.get('date_joined'))
+    user.mess_num = len(messages)
+    user.words_num = len(words)
+    user.chars_num = chars
+    user.active_period = period
+    user.act_mess_num = len(sent)
+    user.act_words_num = len(act_words)
+    user.act_chars_num = act_chars
+    user.words = get_top_words(words)
+
+    db.session.commit()
+
+
+def time_to_update(update_time):
+    delta = datetime.utcnow() - update_time
+    return (24 * delta.days + delta.seconds // 3600) > 24
 
 
 def get_user_info(token):
     return loads(
         get(
-            BASE_URL + '/profile/{}/'.format(
-                loads(
-                    get(
-                        BASE_URL + '/rest-auth/user/',
-                        headers={'Authorization': token}
-                    ).content
-                ).get('username')
-            ),
+            BASE_URL + '/profile/',
             headers={'Authorization': token}
         ).content
     )
@@ -92,7 +185,10 @@ def get_chat_messages(token, chat_id):
 
 
 def count_days(registered_date):
-    delta = date.today() - datetime.strptime(registered_date, "%Y-%m-%dT%H:%M:%SZ").date()
+    try:
+        delta = date.today() - datetime.strptime(registered_date, "%Y-%m-%dT%H:%M:%SZ").date()
+    except:
+        delta = date.today() - datetime.strptime(registered_date, "%Y-%m-%dT%H:%M:%S.%fZ").date()
     return delta.days
 
 
@@ -150,20 +246,36 @@ def most_active_period(messages):
 
 
 def group_messages(messages):
-    groups = set(
-        map(
-            lambda x: datetime.strptime(
-                x['date_created'], 
-                "%Y-%m-%dT%H:%M:%S.%fZ"
-            ).time().hour, 
-            messages
+    try:
+        groups = set(
+            map(
+                lambda x: datetime.strptime(
+                    x['date_created'], 
+                    "%Y-%m-%dT%H:%M:%S.%fZ"
+                ).time().hour, 
+                messages
+            )
         )
-    )
 
-    return [{x: [y['content'] for y in messages if datetime.strptime(
-                y['date_created'], 
-                "%Y-%m-%dT%H:%M:%S.%fZ"
-            ).time().hour == x]} for x in groups]
+        return [{x: [y['content'] for y in messages if datetime.strptime(
+                    y['date_created'], 
+                    "%Y-%m-%dT%H:%M:%S.%fZ"
+                ).time().hour == x]} for x in groups]
+    except:
+        groups = set(
+            map(
+                lambda x: datetime.strptime(
+                    x['date_created'], 
+                    "%Y-%m-%dT%H:%M:%SZ"
+                ).time().hour, 
+                messages
+            )
+        )
+
+        return [{x: [y['content'] for y in messages if datetime.strptime(
+                    y['date_created'], 
+                    "%Y-%m-%dT%H:%M:%SZ"
+                ).time().hour == x]} for x in groups]
 
 
 def time_in_range(start, end, x):
@@ -174,9 +286,10 @@ def time_in_range(start, end, x):
 
 
 def get_top_words(words):
+    top_words = Counter(words).most_common(10)
     return [
-        {
-            'word': word[0],
-            'count': word[1]
-        } for word in Counter(words).most_common(10)
+        UserWord(
+            word=word[0],
+            count=word[1]
+        ) for word in top_words
     ]
