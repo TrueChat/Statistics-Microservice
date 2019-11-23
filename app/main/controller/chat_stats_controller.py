@@ -15,6 +15,7 @@ _chat = ChatDto.chat
 @api.route('/<chat_id>/')
 class Chat(Resource):
     @api.doc('get a chat statistics by its id')
+    @api.marshal_with(_chat)
     @token_required
     def get(self, chat_id):
         return get_chat_statistics(request.headers.get('Authorization'), chat_id)

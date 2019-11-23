@@ -52,12 +52,9 @@ def get_user_barchart(token):
 
     ax.barh(y_pos, performance, align='center', color=(0.11, 0.11, 0.14, 1.0))
     ax.set_yticks(y_pos)
-    ax.set_yticklabels(names, ha='left')
+    ax.set_yticklabels(names, ha='left', fontsize=14)
     ax.invert_yaxis()  # labels read top-to-bottom
 
-    #ax.xaxis.label.set_color('A4A4A6')
-    title = ax.set_title('Top meaningful words')
-    title.set_color(color=(0.64, 0.64, 0.648, 1.0))
 
     plt.tick_params(
         axis='x',
@@ -80,19 +77,20 @@ def get_user_barchart(token):
     [i.set_color(color=(0.64, 0.64, 0.648, 1.0)) for i in plt.gca().get_yticklabels()]
     [i.set_color(color=(0.64, 0.64, 0.648, 1.0)) for i in plt.gca().get_xticklabels()]
 
-    #plt.figure(num=None, figsize=(8, 6), dpi=80, facecolor='w', edgecolor='k')
-
     for i, v in enumerate(user.words):
-        plt.text(v.count+0.2, i, str(round(v.count, 2)), color=(0.64, 0.64, 0.648, 1.0), va="center")
+        plt.text(
+            v.count+0.2, i, 
+            str(round(v.count, 2)), 
+            color=(0.64, 0.64, 0.648, 1.0), 
+            va="center",
+            fontsize=14
+        )
 
     plt.tight_layout()
 
-    #output = io.BytesIO()
-    #FigureCanvas(fig).print_png(output)
-    #return Response(output.getvalue(), mimetype='image/png')
     img = io.BytesIO()
 
-    plt.savefig(img, transparent=True, format='png')
+    plt.savefig(img, transparent=True, dpi=199, format='png')
     img.seek(0)
 
     response = send_file(img, attachment_filename='barchart.png',

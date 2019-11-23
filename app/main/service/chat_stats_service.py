@@ -16,24 +16,31 @@ from requests import get
 
 from .. import BASE_URL
 from .. import db
-from ..model.user import User
-from ..model.user_word import UserWord
-
-
-'''
-    1) Number of messages
-    2) How many days exists
-    3) How many users
-    4) How many actie users (more than 5% messages)
-    5) Number of words
-    6) Number of chars
-    7) Members stats
-    8) Top words plot
-'''
+from ..model.chat import Chat
+from ..model.chat_word import ChatWord
+from ..model.chat_member import ChatMember
 
 
 def get_chat_statistics(token, chat_id):
     chat_info = get_chat_info(token, chat_id)
+    chat = Chat.query.filter_by(id=chat_info['id']).first()
+
+    if chat:
+        if time_to_update(chat.update_time):
+            gather(token, chat_id, chat_info, chat)
+    else:
+        gather(token, chat_id, chat_info, chat)
+
+    return Chat.query.filter_by(id=chat_info['id']).first()
+
+def gather(token, chat_id, chat_info, chat):
+    if not chat:
+        chat = Chat(
+            id=chat_info['id'],
+            update_time=datetime.utcnow()
+        )
+        db.session.add(chat)
+
     messages = get_chat_messages(token, chat_id)
     
     nm_mess = len(messages)
@@ -56,7 +63,6 @@ def get_chat_statistics(token, chat_id):
 
     for k, v in result.items():
         result[k] = {
-            'username': k,
             'mean_char': mean_char(v),
             'mean_word': mean_word(v),
             'num_mess': num_mess(v),
@@ -68,34 +74,56 @@ def get_chat_statistics(token, chat_id):
         if result[k]['percent'] > 5.0:
             act_num += 1
 
+    res = []
+    
     for user in chat_info['users']:
         if not result.get(user['username']):
-            result[user['username']] = {
-                'username': user['username'],
-                'mean_char': 0,
-                'mean_word': 0,
-                'num_mess': 0,
-                'num_words': 0,
-                'num_chars': 0,
-                'percent': 0,
-                'days_in': count_days(user['date_joined'])
-            }
+            res.append(ChatMember(
+                username=user['username'],
+                mean_char=0,
+                mean_word=0,
+                num_mess=0,
+                num_words=0,
+                num_chars=0,
+                percent=0,
+                days_in=count_days(user['date_joined'])
+            ))
         else:
+            temp = result.get(user['username'])
+            
+            res.append(ChatMember(
+                username=user['username'],
+                mean_char=temp['mean_char'],
+                mean_word=temp['mean_word'],
+                num_mess=temp['num_mess'],
+                num_words=temp['num_words'],
+                num_chars=temp['num_chars'],
+                percent=temp['percent'],
+                days_in=count_days(user['date_joined'])
+            ))
             result[user['username']]['days_in'] = count_days(user['date_joined'])
 
     if temp_nm_mess == 0:
         nm_mess = 0
+    
+    afk = 0
+    for mem in res:
+        if mem.num_mess == 0:
+            afk += 1
 
-    return {
-        'num_mess': nm_mess,
-        'num_users': num_users,
-        'days': days,
-        'mean_mess_char_length': mean_char(messages),
-        'mean_mess_word_length': mean_word(messages),
-        'num_act_users': act_num,
-        'num_afk_users': num_users - len(grouped),
-        'grouped': result
-    }, 200
+    chat.mess_num = nm_mess
+    chat.users_num = num_users
+    chat.days_exist = days
+    chat.mean_mess_chars = mean_char(messages)
+    chat.mean_mess_words = mean_word(messages)
+    chat.act_users_num = act_num
+    chat.afk_users_num =  afk
+    chat.members = res
+    chat.words = get_top_words(' '.join(
+        [m['content'] for m in messages]
+    ).split(' '))
+
+    db.session.commit()
 
 
 def num_mess(messages):
@@ -173,3 +201,13 @@ def group_messages(messages):
 
     return [{x: [y['content'] for y in messages if 
     y['user']['username'] == x]} for x in groups]
+
+
+def get_top_words(words):
+    top_words = Counter(words).most_common(10)
+    return [
+        ChatWord(
+            word=word[0],
+            count=word[1]
+        ) for word in top_words
+    ]

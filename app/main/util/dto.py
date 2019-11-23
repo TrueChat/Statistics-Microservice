@@ -44,6 +44,24 @@ class ChatDto:
          to get result.
     ''')
     
+    chat_member = api.model('ChatMember', {
+        'username': fields.String(),
+        'mean_char': fields.Float(),
+        'mean_word': fields.Float(),
+        'num_mess': fields.Integer(),
+        'num_words': fields.Integer(),
+        'num_chars': fields.Integer(),
+        'percent': fields.Float(),
+        'days_in': fields.Integer()
+    })
+
     chat = api.model('Chat', {
-        
+        'mess_num': fields.Integer(description='Number of messages'),
+        'users_num': fields.Integer(description='Number of users'),
+        'days_exist': fields.Integer(description='Number of days it exists'),
+        'mean_mess_chars': fields.Float(description='Mean of messages chars'),
+        'mean_mess_words': fields.Float(description='Mean of messages words'),
+        'act_users_num': fields.Integer(description='Number of active ones'),
+        'afk_users_num': fields.Integer(description='Number of afk users'),
+        'members': fields.List(fields.Nested(chat_member))
     })
