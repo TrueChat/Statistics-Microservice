@@ -42,6 +42,8 @@ def get_chat_statistics(token, chat_id):
     if nm_mess == 0:
         nm_mess = 1
 
+    chat_info['users'].append(chat_info['creator'])
+
     num_users = len(chat_info['users'])
     days = count_days(chat_info['date_created'])
 
