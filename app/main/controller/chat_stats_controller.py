@@ -3,7 +3,8 @@ from flask_restplus import Resource
 
 from ..util.dto import ChatDto
 from ..util.decorator import token_required
-from ..service.chat_stats_service import get_chat_statistics
+from ..service.chat_stats_service import get_chat_statistics, \
+    get_chat_barchart
 
 from .. import BASE_URL
 
@@ -21,9 +22,10 @@ class Chat(Resource):
         return get_chat_statistics(request.headers.get('Authorization'), chat_id)
 
 
-@api.route('/<chat_id>/plot')
+@api.route('/<chat_id>/plot/')
 class ChatPlot(Resource):
-    @api.doc('get a chat words plot by its id')
+    @api.doc('get user top words chart')
     @token_required
     def get(self, chat_id):
-        pass
+        """get a user top words chart given token (*token required)"""
+        return get_chat_barchart(request.headers.get('Authorization'), chat_id)

@@ -211,3 +211,66 @@ def get_top_words(words):
             count=word[1]
         ) for word in top_words
     ]
+
+
+def get_chat_barchart(token, chat_id):
+    chat = Chat.query.filter_by(id=chat_id).first()
+
+    if not chat:
+        response_object = {
+            'message': 'Chat not found'
+        }
+        return response_object, 404
+    
+    plt.rcdefaults()
+    fig, ax = plt.subplots()
+
+    names = [word.word for word in chat.words]
+    y_pos = np.arange(len(names))
+    performance = [word.count for word in chat.words]
+
+    ax.barh(y_pos, performance, align='center', color=(0.11, 0.11, 0.14, 1.0))
+    ax.set_yticks(y_pos)
+    ax.set_yticklabels(names, ha='left', fontsize=14)
+    ax.invert_yaxis()  # labels read top-to-bottom
+
+    plt.tick_params(
+        axis='x',
+        which='both',
+        bottom=False,
+        top=False,
+        labelbottom=False
+    )
+
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['left'].set_visible(False)
+    ax.spines['bottom'].set_visible(False)
+
+    ax.tick_params(axis='x', colors=(0.64, 0.64, 0.648, 1.0))
+    ax.tick_params(axis='y', colors=(0.11, 0.11, 0.14, 1.0))
+
+    ax.tick_params(axis="y",direction="in", pad=-10)
+
+    [i.set_color(color=(0.64, 0.64, 0.648, 1.0)) for i in plt.gca().get_yticklabels()]
+    [i.set_color(color=(0.64, 0.64, 0.648, 1.0)) for i in plt.gca().get_xticklabels()]
+
+    for i, v in enumerate(chat.words):
+        plt.text(
+            v.count+0.2, i, 
+            str(round(v.count, 2)), 
+            color=(0.64, 0.64, 0.648, 1.0), 
+            va="center",
+            fontsize=14
+        )
+
+    plt.tight_layout()
+
+    img = io.BytesIO()
+
+    plt.savefig(img, transparent=True, dpi=199, format='png')
+    img.seek(0)
+
+    response = send_file(img, attachment_filename='barchart.png',
+                 mimetype='image/png')
+    return response

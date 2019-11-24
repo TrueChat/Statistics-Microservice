@@ -7,8 +7,8 @@ class UserDto:
     ''')
 
     user_word = api.model('UserWord', {
-        'word': fields.String,
-        'count': fields.Integer
+        'word': fields.String(),
+        'count': fields.Integer()
     })
 
     words = api.model('Words', {
