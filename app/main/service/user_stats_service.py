@@ -47,10 +47,10 @@ def get_user_barchart(token):
     fig, ax = plt.subplots()
 
     names = [word.word for word in user.words]
-    y_pos = np.arange(len(names))
+    y_pos = np.arange(0, len(names) * 2, 2)
     performance = [word.count for word in user.words]
 
-    ax.barh(y_pos, performance, align='center', color=(0.11, 0.11, 0.14, 1.0))
+    ax.barh(y_pos, performance, height=1.5, left=0.3, align='center', color=(0.11, 0.11, 0.14, 1.0))
     ax.set_yticks(y_pos)
     ax.set_yticklabels(names, ha='left', fontsize=14)
     ax.invert_yaxis()  # labels read top-to-bottom
@@ -77,14 +77,9 @@ def get_user_barchart(token):
     [i.set_color(color=(0.64, 0.64, 0.648, 1.0)) for i in plt.gca().get_yticklabels()]
     [i.set_color(color=(0.64, 0.64, 0.648, 1.0)) for i in plt.gca().get_xticklabels()]
 
+    coord = user.words[0].count
     for i, v in enumerate(user.words):
-        plt.text(
-            v.count+0.2, i, 
-            str(round(v.count, 2)), 
-            color=(0.64, 0.64, 0.648, 1.0), 
-            va="center",
-            fontsize=14
-        )
+        plt.text(coord+0.2, i * 2, str(round(v.count, 2)), color=(0.64, 0.64, 0.648, 1.0), va="center", fontsize=14)
 
     plt.tight_layout()
 
